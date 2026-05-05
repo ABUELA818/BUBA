@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Modelos pesados
+assets/body_models/*.npz
+assets/body_models/*.pkl
+assets/body_models/*.task
+
+# Entorno
+.env
+.env.local
+*.env
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/settings.json
+
+# Logs
+*.log
+celerybeat-schedule

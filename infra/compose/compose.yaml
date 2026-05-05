@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: buba_postgres
+    environment:
+      POSTGRES_DB: buba
+      POSTGRES_USER: buba
+      POSTGRES_PASSWORD: buba_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buba"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: buba_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ../../apps/api
+      dockerfile: ../../infra/docker/api.Dockerfile
+    container_name: buba_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://buba:buba_secret@postgres:5432/buba
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ../../apps/api:/app
+      - ../../assets:/assets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: ../../apps/api
+      dockerfile: ../../infra/docker/api.Dockerfile
+    container_name: buba_worker
+    environment:
+      DATABASE_URL: postgresql://buba:buba_secret@postgres:5432/buba
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ../../apps/api:/app
+      - ../../assets:/assets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A workers.celery_app worker --loglevel=info
+
+volumes:
+  postgres_data:
