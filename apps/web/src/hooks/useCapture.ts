@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { CaptureFrame, QualityResult } from '../types';
+import type { CaptureFrame, QualityResult, FaceResult } from '../types';
 import { api } from '../services/api';
 import type { CalibrationResult, ReconstructionResult, MetricsResult, RecommendationResult } from '../services/api';
 
@@ -18,12 +18,17 @@ export function useCapture({ heightCm, videoRef }: UseCaptureProps) {
   const [reconstruction, setReconstruction] = useState<ReconstructionResult | null>(null);
   const [bodyMetrics, setBodyMetrics] = useState<MetricsResult | null>(null);
   const [recommendation, setRecommendation] = useState<RecommendationResult | null>(null);
+  const [faceResult, setFaceResult] = useState<FaceResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [textureResult, setTextureResult] = useState<any>(null);
+  const [autoHairColor, setAutoHairColor] = useState<string | null>(null);
+  const [autoHairStyle, setAutoHairStyle] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string | null>(null);
   const landmarkBufferRef = useRef<any[]>([]);
   const calibratedRef = useRef(false);
   const reconstructedRef = useRef(false);
+  const faceAnalyzedRef = useRef(false);
 
   const ensureSession = useCallback(async () => {
     if (sessionIdRef.current) return sessionIdRef.current;
@@ -32,19 +37,34 @@ export function useCapture({ heightCm, videoRef }: UseCaptureProps) {
     return session_id;
   }, [heightCm]);
 
-  const runFullPipeline = useCallback(async (landmarks: any[]) => {
+  const runFullPipeline = useCallback(async (landmarks: any[], imageData: string) => {
     if (reconstructedRef.current) return;
     reconstructedRef.current = true;
     setIsProcessing(true);
 
     try {
-      const recon = await api.reconstruct(landmarks, heightCm);
+      const [recon, faceRes, textureRes] = await Promise.all([
+        api.reconstruct(landmarks, heightCm),
+        !faceAnalyzedRef.current ? api.analyzeFace(imageData) : Promise.resolve(null),
+        api.extractTexture(imageData),
+      ]);
+
       setReconstruction(recon);
+
+      if (faceRes && faceRes.detected) {
+        faceAnalyzedRef.current = true;
+        setFaceResult(faceRes);
+      }
+
+      if (textureRes.success) {
+        setTextureResult(textureRes);
+        if (textureRes.hair_color) setAutoHairColor(textureRes.hair_color);
+        if (textureRes.hair_style) setAutoHairStyle(textureRes.hair_style as any);
+      }
 
       if (recon.success && recon.joint_positions && recon.scale) {
         const met = await api.computeMetrics(recon.joint_positions, recon.scale);
         setBodyMetrics(met);
-
         const rec = await api.getRecommendation(met.body_type, met.measurements);
         setRecommendation(rec);
       }
@@ -106,7 +126,7 @@ export function useCapture({ heightCm, videoRef }: UseCaptureProps) {
 
         if (landmarkBufferRef.current.length >= 5 && !reconstructedRef.current) {
           const midLandmarks = landmarkBufferRef.current[Math.floor(landmarkBufferRef.current.length / 2)];
-          await runFullPipeline(midLandmarks);
+          await runFullPipeline(midLandmarks, imageData);
         }
       }
     } catch (err) {
@@ -129,13 +149,18 @@ export function useCapture({ heightCm, videoRef }: UseCaptureProps) {
     landmarkBufferRef.current = [];
     calibratedRef.current = false;
     reconstructedRef.current = false;
+    faceAnalyzedRef.current = false;
     setFrames([]);
     setLastResult(null);
     setCalibration(null);
     setReconstruction(null);
     setBodyMetrics(null);
     setRecommendation(null);
+    setFaceResult(null);
     setIsProcessing(false);
+    setTextureResult(null);
+    setAutoHairColor(null);
+    setAutoHairStyle(null);
   }, []);
 
   return {
@@ -147,7 +172,11 @@ export function useCapture({ heightCm, videoRef }: UseCaptureProps) {
     reconstruction,
     bodyMetrics,
     recommendation,
+    faceResult,
     startCapturing,
     resetSession,
+    textureResult,
+    autoHairColor,
+    autoHairStyle,
   };
 }

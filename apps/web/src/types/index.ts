@@ -35,6 +35,21 @@ export interface QualityResult {
   stability_score: number;
 }
 
+export interface FaceMetrics {
+  face_ratio?: number;
+  eye_spacing_ratio?: number;
+  mouth_width_ratio?: number;
+  face_shape?: string;
+}
+
+export interface FaceResult {
+  detected: boolean;
+  landmarks: LandmarkPoint[];
+  blendshapes: Record<string, number>;
+  face_metrics: FaceMetrics;
+  landmark_count: number;
+}
+
 export interface CaptureState {
   status: 'idle' | 'requesting' | 'previewing' | 'capturing' | 'processing' | 'done' | 'error';
   heightCm: number | null;

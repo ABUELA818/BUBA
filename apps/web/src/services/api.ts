@@ -26,6 +26,8 @@ export interface ReconstructionResult {
   joint_positions?: number[][];
   vertices?: number[][];
   faces?: number[][];
+  vt?: number[][];
+  ft?: number[][];
 }
 
 export interface MetricsResult {
@@ -121,4 +123,39 @@ export const api = {
     });
     return res.data;
   },
+
+  analyzeFace: async (imageData: string): Promise<FaceResult> => {
+    const res = await client.post('/face/analyze', {
+      image_data: imageData,
+    });
+    return res.data;
+  },
+
+  extractTexture: async (imageData: string): Promise<TextureResult> => {
+    const res = await client.post('/texture/extract', {
+      image_data: imageData,
+    });
+    return res.data;
+  },
 };
+
+export interface FaceResult {
+  detected: boolean;
+  landmarks: LandmarkPoint[];
+  blendshapes: Record<string, number>;
+  face_metrics: {
+    face_ratio?: number;
+    eye_spacing_ratio?: number;
+    mouth_width_ratio?: number;
+    face_shape?: string;
+  };
+  landmark_count: number;
+}
+
+export interface TextureResult {
+  success: boolean;
+  face_texture: string | null;
+  hair_color: string | null;
+  hair_style: string | null;
+  message: string;
+}

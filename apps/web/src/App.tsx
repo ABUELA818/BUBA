@@ -1,31 +1,41 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { HeightInput } from './components/capture-wizard/HeightInput';
 import { CameraPreview } from './components/camera-preview/CameraPreview';
 import { BodyViewer } from './components/body-viewer/BodyViewer';
+import { HairSelector } from './components/body-viewer/HairSelector';
 import { useCapture } from './hooks/useCapture';
+import type { HairStyle } from './components/body-viewer/HairMesh';
 
 type AppStep = 'height' | 'camera' | 'result';
 
 function App() {
   const [step, setStep] = useState<AppStep>('height');
   const [heightCm, setHeightCm] = useState<number | null>(null);
+  const [hairStyle, setHairStyle] = useState<HairStyle>('short');
+  const [hairColor, setHairColor] = useState('#1a0a00');
+  const [faceTexture, setFaceTexture] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const {
     frames, lastResult, calibration, reconstruction,
-    bodyMetrics, recommendation, isCapturing, isProcessing,
-    startCapturing, resetSession,
+    bodyMetrics, recommendation, faceResult,
+    textureResult, autoHairColor, autoHairStyle,
+    isCapturing, isProcessing, startCapturing, resetSession,
   } = useCapture({
     heightCm: heightCm ?? 170,
     videoRef,
   });
 
+  useEffect(() => {
+    if (autoHairColor) setHairColor(autoHairColor);
+    if (autoHairStyle) setHairStyle(autoHairStyle as HairStyle);
+    if (textureResult?.face_texture) setFaceTexture(textureResult.face_texture);
+  }, [autoHairColor, autoHairStyle, textureResult]);
+
   const handleHeightConfirm = (height: number) => {
     setHeightCm(height);
     setStep('camera');
   };
-
-  const handleViewResult = () => setStep('result');
 
   return (
     <div style={{ minHeight: '100vh', background: '#0f0f0f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '24px', padding: '24px' }}>
@@ -67,6 +77,22 @@ function App() {
             </div>
           )}
 
+          {faceResult?.detected && (
+            <div style={{ background: '#1a1a3a', border: '1px solid #818cf8', borderRadius: '8px', padding: '12px 16px', width: '100%' }}>
+              <p style={{ color: '#818cf8', margin: '0 0 6px 0', fontSize: '13px', fontWeight: 600 }}>
+                Cara detectada — {faceResult.landmark_count} puntos
+              </p>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', flexWrap: 'wrap' }}>
+                {faceResult.face_metrics.face_shape && (
+                  <span style={{ color: '#aaa' }}>Forma: <strong style={{ color: 'white' }}>{faceResult.face_metrics.face_shape}</strong></span>
+                )}
+                {faceResult.face_metrics.face_ratio && (
+                  <span style={{ color: '#aaa' }}>Ratio: <strong style={{ color: 'white' }}>{faceResult.face_metrics.face_ratio.toFixed(2)}</strong></span>
+                )}
+              </div>
+            </div>
+          )}
+
           {isProcessing && (
             <div style={{ background: '#2a1a3a', border: '1px solid #a78bfa', borderRadius: '8px', padding: '12px 16px', width: '100%' }}>
               <p style={{ color: '#a78bfa', margin: 0, fontSize: '13px' }}>⏳ Procesando reconstrucción 3D...</p>
@@ -75,7 +101,7 @@ function App() {
 
           {reconstruction?.success && !isProcessing && (
             <button
-              onClick={handleViewResult}
+              onClick={() => setStep('result')}
               style={{ background: '#6366f1', color: 'white', border: 'none', borderRadius: '8px', padding: '12px 24px', fontSize: '15px', cursor: 'pointer', fontWeight: 600, width: '100%' }}
             >
               Ver resultado 3D →
@@ -106,11 +132,36 @@ function App() {
 
       {step === 'result' && reconstruction?.joint_positions && (
         <div style={{ width: '100%', maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          <HairSelector
+            hairStyle={hairStyle}
+            hairColor={hairColor}
+            onStyleChange={setHairStyle}
+            onColorChange={setHairColor}
+          />
+
           <BodyViewer
             vertices={reconstruction.vertices ?? []}
             faces={reconstruction.faces ?? []}
             jointPositions={reconstruction.joint_positions}
+            hairStyle={hairStyle}
+            hairColor={hairColor}
+            faceTexture={faceTexture}
+            vt={reconstruction.vt}
+            ft={reconstruction.ft}
           />
+
+          {faceResult?.detected && (
+            <div style={{ background: '#1a1a3a', border: '1px solid #818cf8', borderRadius: '8px', padding: '12px 16px' }}>
+              <p style={{ color: '#818cf8', margin: '0 0 6px 0', fontSize: '13px', fontWeight: 600 }}>Análisis facial</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '12px' }}>
+                {faceResult.face_metrics.face_shape && <span style={{ color: '#aaa' }}>Forma de cara: <strong style={{ color: 'white' }}>{faceResult.face_metrics.face_shape}</strong></span>}
+                {faceResult.face_metrics.face_ratio && <span style={{ color: '#aaa' }}>Ratio alto/ancho: <strong style={{ color: 'white' }}>{faceResult.face_metrics.face_ratio.toFixed(2)}</strong></span>}
+                {faceResult.face_metrics.eye_spacing_ratio && <span style={{ color: '#aaa' }}>Espaciado ojos: <strong style={{ color: 'white' }}>{faceResult.face_metrics.eye_spacing_ratio.toFixed(2)}</strong></span>}
+                {faceResult.face_metrics.mouth_width_ratio && <span style={{ color: '#aaa' }}>Ancho boca: <strong style={{ color: 'white' }}>{faceResult.face_metrics.mouth_width_ratio.toFixed(2)}</strong></span>}
+              </div>
+            </div>
+          )}
 
           {bodyMetrics && (
             <div style={{ background: '#1a1a2a', border: '1px solid #818cf8', borderRadius: '8px', padding: '12px 16px' }}>

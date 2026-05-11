@@ -38,6 +38,8 @@ class ReconstructResponse(BaseModel):
     joint_positions: list[list[float]] | None = None
     vertices: list[list[float]] | None = None
     faces: list[list[int]] | None = None
+    vt: list[list[float]] | None = None
+    ft: list[list[int]] | None = None
 
 
 class AsyncReconstructResponse(BaseModel):

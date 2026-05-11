@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import capture, sessions, calibration, reconstruction, metrics, recommendation
+from routers import capture, sessions, calibration, reconstruction, metrics, recommendation, face, texture
 from database import create_tables
 import os
 
@@ -24,6 +24,8 @@ app.include_router(calibration.router)
 app.include_router(reconstruction.router)
 app.include_router(metrics.router)
 app.include_router(recommendation.router)
+app.include_router(face.router)
+app.include_router(texture.router)
 
 @app.on_event("startup")
 def on_startup():

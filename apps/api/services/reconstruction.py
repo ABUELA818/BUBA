@@ -96,7 +96,7 @@ def estimate_shape(landmarks: list, height_cm: float, model: dict) -> dict:
         v_final = v_shaped * scale
         joints_final = joints * scale
 
-    return {
+    result = {
         "success": True,
         "betas": betas.detach().numpy().tolist(),
         "scale": float(scale),
@@ -105,3 +105,9 @@ def estimate_shape(landmarks: list, height_cm: float, model: dict) -> dict:
         "faces": model["faces"].tolist(),
         "message": "Reconstrucción completada",
     }
+
+    if "vt" in model and "ft" in model:
+        result["vt"] = model["vt"].tolist()
+        result["ft"] = model["ft"].tolist()
+
+    return result
